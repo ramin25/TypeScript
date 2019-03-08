@@ -5305,6 +5305,12 @@ namespace ts {
         /** Hoists a variable declaration to the containing scope. */
         hoistVariableDeclaration(node: Identifier): void;
 
+        /* @internal */
+        startBlockScope(): void;
+
+        /* @internal */
+        endBlockScope(): Statement[] | undefined;
+
         /** Records a request for a non-scoped emit helper in the current context. */
         requestEmitHelper(helper: EmitHelper): void;
 

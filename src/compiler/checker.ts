@@ -16726,6 +16726,11 @@ namespace ts {
                             if (container.kind === SyntaxKind.PropertyDeclaration && hasModifier(container, ModifierFlags.Static)) {
                                 getNodeLinks(declaration).flags |= NodeCheckFlags.ClassWithConstructorReference;
                                 getNodeLinks(node).flags |= NodeCheckFlags.ConstructorReferenceInClass;
+                                // If the class expression is in a loop and the name of the class is used,
+                                // the temporary variable which stores the evaluated class expression must be block scoped.
+                                if (getEnclosingIterationStatement(declaration)) {
+                                    getNodeLinks(declaration).flags |= NodeCheckFlags.BlockScopedBindingInLoop;
+                                }
                             }
                             break;
                         }
@@ -16831,6 +16836,10 @@ namespace ts {
             return !!findAncestor(node, n => n === threshold ? "quit" : isFunctionLike(n));
         }
 
+        function getEnclosingIterationStatement(node: Node): Node | undefined {
+            return findAncestor(node, n => (!n || nodeStartsNewLexicalEnvironment(n)) ? "quit" : isIterationStatement(n, /* lookInLabeledStatements */ false));
+        }
+
         function getPartOfForStatementContainingNode(node: Node, container: ForStatement) {
             return findAncestor(node, n => n === container ? "quit" : n === container.initializer || n === container.condition || n === container.incrementor || n === container.statement);
         }
@@ -16849,18 +16858,8 @@ namespace ts {
 
             const container = getEnclosingBlockScopeContainer(symbol.valueDeclaration);
             const usedInFunction = isInsideFunction(node.parent, container);
-            let current = container;
-
-            let containedInIterationStatement = false;
-            while (current && !nodeStartsNewLexicalEnvironment(current)) {
-                if (isIterationStatement(current, /*lookInLabeledStatements*/ false)) {
-                    containedInIterationStatement = true;
-                    break;
-                }
-                current = current.parent;
-            }
-
-            if (containedInIterationStatement) {
+            const enclosingIterationStatement = getEnclosingIterationStatement(container);
+            if (enclosingIterationStatement) {
                 if (usedInFunction) {
                     // mark iteration statement as containing block-scoped binding captured in some function
                     let capturesBlockScopeBindingInLoopBody = true;
@@ -16880,7 +16879,7 @@ namespace ts {
                         }
                     }
                     if (capturesBlockScopeBindingInLoopBody) {
-                        getNodeLinks(current).flags |= NodeCheckFlags.LoopWithCapturedBlockScopedBinding;
+                        getNodeLinks(enclosingIterationStatement).flags |= NodeCheckFlags.LoopWithCapturedBlockScopedBinding;
                     }
                 }
 
@@ -18439,6 +18438,20 @@ namespace ts {
             const links = getNodeLinks(node.expression);
             if (!links.resolvedType) {
                 links.resolvedType = checkExpression(node.expression);
+
+                if (isPropertyDeclaration(node.parent) && isClassExpression(node.parent.parent)) {
+                    const container = getEnclosingBlockScopeContainer(node);
+                    const enclosingIterationStatement = getEnclosingIterationStatement(container);
+                    // A computed property of a class expression inside a loop must be block scoped because
+                    // the property name should be bound at class evaluation time.
+                    if (enclosingIterationStatement) {
+                        getNodeLinks(enclosingIterationStatement).flags |= NodeCheckFlags.LoopWithCapturedBlockScopedBinding;
+                        // The hoisted variable which stores the evaluated property name should be block scoped.
+                        getNodeLinks(node).flags |= NodeCheckFlags.BlockScopedBindingInLoop;
+                        // The temporary name of the class expression should be block scoped.
+                        getNodeLinks(node.parent.parent).flags |= NodeCheckFlags.BlockScopedBindingInLoop;
+                    }
+                }
                 // This will allow types number, string, symbol or any. It will also allow enums, the unknown
                 // type, and any union of these types (like string | number).
                 if (links.resolvedType.flags & TypeFlags.Nullable ||

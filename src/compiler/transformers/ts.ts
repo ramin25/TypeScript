@@ -37,6 +37,8 @@ namespace ts {
             resumeLexicalEnvironment,
             endLexicalEnvironment,
             hoistVariableDeclaration,
+            startBlockScope,
+            endBlockScope
         } = context;
 
         const resolver = context.getEmitResolver();
@@ -360,6 +362,8 @@ namespace ts {
             }
 
             switch (node.kind) {
+                case SyntaxKind.Block:
+                    return visitBlock(node as Block);
                 case SyntaxKind.ExportKeyword:
                 case SyntaxKind.DefaultKeyword:
                     // ES6 export and default modifiers are elided when inside a namespace.
@@ -547,6 +551,19 @@ namespace ts {
                     // node contains some other TypeScript syntax
                     return visitEachChild(node, visitor, context);
             }
+        }
+
+        function visitBlock(node: Block): Block {
+            startBlockScope();
+            node = visitEachChild(node, visitor, context);
+            const declarations = endBlockScope();
+            if (some(declarations)) {
+                return updateBlock(
+                    node,
+                    mergeLexicalEnvironment(node.statements, declarations)
+                );
+            }
+            return node;
         }
 
         function visitSourceFile(node: SourceFile) {
@@ -909,7 +926,13 @@ namespace ts {
             if (some(staticProperties) || some(pendingExpressions)) {
                 const expressions: Expression[] = [];
                 const isClassWithConstructorReference = resolver.getNodeCheckFlags(node) & NodeCheckFlags.ClassWithConstructorReference;
-                const temp = createTempVariable(hoistVariableDeclaration, !!isClassWithConstructorReference);
+                const temp = createTempVariable(
+                    name => {
+                        setOriginalNode(name, node);
+                        hoistVariableDeclaration(name);
+                    },
+                    !!isClassWithConstructorReference
+                );
                 if (isClassWithConstructorReference) {
                     // record an alias as the class name is not in scope for statics.
                     enableSubstitutionForClassAliases();
@@ -2185,6 +2208,7 @@ namespace ts {
                 const inlinable = isSimpleInlineableExpression(innerExpression);
                 if (!inlinable && shouldHoist) {
                     const generatedName = getGeneratedNameForNode(name);
+                    setOriginalNode(generatedName, name);
                     hoistVariableDeclaration(generatedName);
                     return createAssignment(generatedName, expression);
                 }

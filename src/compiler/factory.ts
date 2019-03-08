@@ -3172,6 +3172,8 @@ namespace ts {
         enableEmitNotification: noop,
         enableSubstitution: noop,
         endLexicalEnvironment: () => undefined,
+        endBlockScope: () => undefined,
+        startBlockScope: noop,
         getCompilerOptions: notImplemented,
         getEmitHost: notImplemented,
         getEmitResolver: notImplemented,

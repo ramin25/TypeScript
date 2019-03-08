@@ -102,6 +102,9 @@ namespace ts {
         let lexicalEnvironmentFunctionDeclarationsStack: FunctionDeclaration[][] = [];
         let lexicalEnvironmentStackOffset = 0;
         let lexicalEnvironmentSuspended = false;
+        let blockScopedVariableDeclarationsStack: Identifier[][] = [];
+        let blockScopeStackOffset = 0;
+        let blockScopedVariableDeclarations: Identifier[];
         let emitHelpers: EmitHelper[] | undefined;
         let onSubstituteNode: TransformationContext["onSubstituteNode"] = noEmitSubstitution;
         let onEmitNode: TransformationContext["onEmitNode"] = noEmitNotification;
@@ -120,6 +123,8 @@ namespace ts {
             endLexicalEnvironment,
             hoistVariableDeclaration,
             hoistFunctionDeclaration,
+            startBlockScope,
+            endBlockScope,
             requestEmitHelper,
             readEmitHelpers,
             enableSubstitution,
@@ -247,6 +252,11 @@ namespace ts {
         function hoistVariableDeclaration(name: Identifier): void {
             Debug.assert(state > TransformationState.Uninitialized, "Cannot modify the lexical environment during initialization.");
             Debug.assert(state < TransformationState.Completed, "Cannot modify the lexical environment after transformation has completed.");
+            // If the checker determined that this is a block scoped binding in a loop, we must emit a block-level variable declaration.
+            if (resolver && resolver.getNodeCheckFlags(name) & NodeCheckFlags.BlockScopedBindingInLoop) {
+                (blockScopedVariableDeclarations || (blockScopedVariableDeclarations = [])).push(name);
+                return;
+            }
             const decl = setEmitFlags(createVariableDeclaration(name), EmitFlags.NoNestedSourceMaps);
             if (!lexicalEnvironmentVariableDeclarations) {
                 lexicalEnvironmentVariableDeclarations = [decl];
@@ -268,6 +278,41 @@ namespace ts {
             else {
                 lexicalEnvironmentFunctionDeclarations.push(func);
             }
+        }
+
+        /**
+         * Starts a block scope. Any existing block hoisted variables are pushed onto the stack and the related storage variables are reset.
+         */
+        function startBlockScope() {
+            Debug.assert(state > TransformationState.Uninitialized, "Cannot start a block scope during initialization.");
+            Debug.assert(state < TransformationState.Completed, "Cannot start a block scope after transformation has completed.");
+            blockScopedVariableDeclarationsStack[blockScopeStackOffset] = blockScopedVariableDeclarations;
+            blockScopeStackOffset++;
+            blockScopedVariableDeclarations = undefined!;
+        }
+
+        /**
+         * Ends a block scope. The previous set of block hoisted variables are restored. Any hoisted declarations are returned.
+         */
+        function endBlockScope() {
+            Debug.assert(state > TransformationState.Uninitialized, "Cannot end a block scope during initialization.");
+            Debug.assert(state < TransformationState.Completed, "Cannot end a block scope after transformation has completed.");
+            const statements: Statement[] | undefined = some(blockScopedVariableDeclarations) ?
+                [
+                    createVariableStatement(
+                        /*modifiers*/ undefined,
+                        createVariableDeclarationList(
+                            blockScopedVariableDeclarations.map(identifier => createVariableDeclaration(identifier)),
+                            NodeFlags.Let
+                        )
+                    )
+                ] : undefined;
+            blockScopeStackOffset--;
+            blockScopedVariableDeclarations = blockScopedVariableDeclarationsStack[blockScopeStackOffset];
+            if (blockScopeStackOffset === 0) {
+                blockScopedVariableDeclarationsStack = [];
+            }
+            return statements;
         }
 
         /**
