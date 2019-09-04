@@ -12,8 +12,8 @@ class A {
 
 
 //// [privateNameAndIndexSignature.js]
-var _foo;
 "use strict";
+var _foo;
 class A {
     constructor(message) {
         _foo.set(this, 3);

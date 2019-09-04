@@ -8,6 +8,7 @@ class A {
 
 
 //// [privateNamesNoDelete.js]
+"use strict";
 var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, privateMap) {
     if (!privateMap.has(receiver)) {
         throw new TypeError("attempted to get private field on non-instance");
@@ -15,7 +16,6 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     return privateMap.get(receiver);
 };
 var _v;
-"use strict";
 class A {
     constructor() {
         _v.set(this, 1);

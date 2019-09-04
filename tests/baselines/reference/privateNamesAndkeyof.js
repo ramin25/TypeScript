@@ -9,8 +9,8 @@ type T = keyof A     // should not include '#foo'
 
 
 //// [privateNamesAndkeyof.js]
-var _foo;
 "use strict";
+var _foo;
 class A {
     constructor() {
         _foo.set(this, 3);

@@ -28,6 +28,7 @@ b = a;                                    // Error
 
 
 //// [privateNamesAndGenericClasses-2.js]
+"use strict";
 var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, privateMap, value) {
     if (!privateMap.has(receiver)) {
         throw new TypeError("attempted to set private field on non-instance");
@@ -42,7 +43,6 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     return privateMap.get(receiver);
 };
 var _foo;
-"use strict";
 class C {
     constructor(t) {
         _foo.set(this, void 0);

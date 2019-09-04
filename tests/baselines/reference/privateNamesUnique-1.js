@@ -11,8 +11,8 @@ const b: A = new B();     // Error: Property #foo is missing
 
 
 //// [privateNamesUnique-1.js]
-var _foo, _foo_1;
 "use strict";
+var _foo, _foo_1;
 class A {
     constructor() {
         _foo.set(this, void 0);

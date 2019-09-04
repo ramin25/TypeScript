@@ -90,8 +90,8 @@ class A {
 >2 : 2
 
         ({ a: this.#field = 1, b: [this.#field = 1] } = { b: [] });
->({ a: this.#field = 1, b: [this.#field = 1] } = { b: [] }) : { b: [number?]; a?: number; }
->{ a: this.#field = 1, b: [this.#field = 1] } = { b: [] } : { b: [number?]; a?: number; }
+>({ a: this.#field = 1, b: [this.#field = 1] } = { b: [] }) : { b: []; a?: number; }
+>{ a: this.#field = 1, b: [this.#field = 1] } = { b: [] } : { b: []; a?: number; }
 >{ a: this.#field = 1, b: [this.#field = 1] } : { a?: number; b: [number]; }
 >a : number
 >this.#field = 1 : 1
@@ -104,21 +104,21 @@ class A {
 >this.#field : number
 >this : this
 >1 : 1
->{ b: [] } : { b: [number?]; a?: number; }
->b : [number?]
->[] : [number?]
+>{ b: [] } : { b: []; a?: number; }
+>b : []
+>[] : []
 
         [this.#field = 2] = [];
->[this.#field = 2] = [] : [number?]
+>[this.#field = 2] = [] : []
 >[this.#field = 2] : [number]
 >this.#field = 2 : 2
 >this.#field : number
 >this : this
 >2 : 2
->[] : [number?]
+>[] : []
 
         [this.otherObject.#field = 2] = [];
->[this.otherObject.#field = 2] = [] : [number?]
+>[this.otherObject.#field = 2] = [] : []
 >[this.otherObject.#field = 2] : [number]
 >this.otherObject.#field = 2 : 2
 >this.otherObject.#field : number
@@ -126,7 +126,7 @@ class A {
 >this : this
 >otherObject : A
 >2 : 2
->[] : [number?]
+>[] : []
     }
     static test(_a: A) {
 >test : (_a: A) => void

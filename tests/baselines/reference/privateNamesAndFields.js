@@ -16,6 +16,7 @@ class B extends A {
 
 
 //// [privateNamesAndFields.js]
+"use strict";
 var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, privateMap, value) {
     if (!privateMap.has(receiver)) {
         throw new TypeError("attempted to set private field on non-instance");
@@ -24,7 +25,6 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
     return value;
 };
 var _foo, _foo_1;
-"use strict";
 class A {
     constructor() {
         _foo.set(this, void 0);
