@@ -368,7 +368,10 @@ namespace ts {
             getDeclaredTypeOfSymbol,
             getPropertiesOfType,
             getPropertyOfType: (type, name) => getPropertyOfType(type, escapeLeadingUnderscores(name)),
-            getPrivateIdentifierPropertyOfType,
+            getPrivateIdentifierPropertyOfType: (leftType: Type, right: PrivateIdentifier) => {
+                const lexicallyScopedIdentifier = lookupSymbolForPrivateIdentifierDeclaration(right);
+                return lexicallyScopedIdentifier ? getPrivateIdentifierPropertyOfType(leftType, lexicallyScopedIdentifier) : undefined;
+            },
             getTypeOfPropertyOfType: (type, name) => getTypeOfPropertyOfType(type, escapeLeadingUnderscores(name)),
             getIndexInfoOfType,
             getSignaturesOfType,
@@ -20750,15 +20753,13 @@ namespace ts {
             }
         }
 
-        function getPrivateIdentifierPropertyOfType(leftType: Type, right: PrivateIdentifier): Symbol | undefined;
-        function getPrivateIdentifierPropertyOfType(leftType: Type, right: PrivateIdentifier, lexicallyScopedIdentifier: Symbol | undefined): Symbol | undefined;
-        function getPrivateIdentifierPropertyOfType(leftType: Type, right: PrivateIdentifier, lexicallyScopedIdentifier = lookupSymbolForPrivateIdentifierDeclaration(right)): Symbol | undefined {
+        function getPrivateIdentifierPropertyOfType(leftType: Type, lexicallyScopedIdentifier: Symbol): Symbol | undefined {
             leftType = getApparentType(leftType);
             if (!(leftType.flags & TypeFlags.Object)) {
                 return undefined;
             }
             const properties = isConstructorType(leftType) ? leftType.symbol.exports : resolveStructuredTypeMembers(leftType as ObjectType).members;
-            if (lexicallyScopedIdentifier && properties && properties.has(lexicallyScopedIdentifier.escapedName)) {
+            if (properties && properties.has(lexicallyScopedIdentifier.escapedName)) {
                 return lexicallyScopedIdentifier;
             }
         }
@@ -20850,7 +20851,7 @@ namespace ts {
             let prop: Symbol | undefined;
             if (isPrivateIdentifier(right)) {
                 const lexicallyScopedSymbol = lookupSymbolForPrivateIdentifierDeclaration(right);
-                prop = getPrivateIdentifierPropertyOfType(leftType, right, lexicallyScopedSymbol);
+                prop = lexicallyScopedSymbol ? getPrivateIdentifierPropertyOfType(leftType, lexicallyScopedSymbol) : undefined;
                 // Check for private-identifier-specific shadowing and lexical-scoping errors.
                 if (!prop && checkPrivateIdentifierPropertyAccess(leftType, right, lexicallyScopedSymbol)) {
                     return errorType;
@@ -26489,31 +26490,31 @@ namespace ts {
                     if (subsequentNode.kind === node.kind) {
                         const errorNode: Node = (<FunctionLikeDeclaration>subsequentNode).name || subsequentNode;
                         const subsequentName = (<FunctionLikeDeclaration>subsequentNode).name;
-                        const areBothNamesSame = node.name && subsequentName && (
-                            // Both are private names which are the same.
-                            (isPrivateIdentifier(node.name) && isPrivateIdentifier(subsequentName) && node.name.escapedText === subsequentName.escapedText) ||
-                            // Both are computed property names
-                            // TODO: GH#17345: These are methods, so handle computed name case. (`Always allowing computed property names is *not* the correct behavior!)
-                            (isComputedPropertyName(node.name) && isComputedPropertyName(subsequentName)) ||
-                            // Both are literal property names that are the same.
-                            (isPropertyNameLiteral(node.name) && isPropertyNameLiteral(subsequentName) &&
-                                getEscapedTextOfIdentifierOrLiteral(node.name) === getEscapedTextOfIdentifierOrLiteral(subsequentName))
-                        );
-                        if (node.name && subsequentName && areBothNamesSame) {
-                            const reportError =
-                                (node.kind === SyntaxKind.MethodDeclaration || node.kind === SyntaxKind.MethodSignature) &&
-                                hasModifier(node, ModifierFlags.Static) !== hasModifier(subsequentNode, ModifierFlags.Static);
-                            // we can get here in two cases
-                            // 1. mixed static and instance class members
-                            // 2. something with the same name was defined before the set of overloads that prevents them from merging
-                            // here we'll report error only for the first case since for second we should already report error in binder
-                            if (reportError) {
-                                const diagnostic = hasModifier(node, ModifierFlags.Static) ? Diagnostics.Function_overload_must_be_static : Diagnostics.Function_overload_must_not_be_static;
-                                error(errorNode, diagnostic);
+                        if (node.name && subsequentName) {
+                            const areBothSame = isPrivateIdentifier(node.name) && isPrivateIdentifier(subsequentName) &&
+                                node.name.escapedText === subsequentName.escapedText ||
+                                // Both are computed property names
+                                // TODO: GH#17345: These are methods, so handle computed name case. (`Always allowing computed property names is *not* the correct behavior!)
+                                isComputedPropertyName(node.name) && isComputedPropertyName(subsequentName) ||
+                                // Both are literal property names that are the same.
+                                isPropertyNameLiteral(node.name) && isPropertyNameLiteral(subsequentName) &&
+                                getEscapedTextOfIdentifierOrLiteral(node.name) === getEscapedTextOfIdentifierOrLiteral(subsequentName);
+                            if (areBothSame) {
+                                const reportError =
+                                    (node.kind === SyntaxKind.MethodDeclaration || node.kind === SyntaxKind.MethodSignature) &&
+                                    hasModifier(node, ModifierFlags.Static) !== hasModifier(subsequentNode, ModifierFlags.Static);
+                                // we can get here in two cases
+                                // 1. mixed static and instance class members
+                                // 2. something with the same name was defined before the set of overloads that prevents them from merging
+                                // here we'll report error only for the first case since for second we should already report error in binder
+                                if (reportError) {
+                                    const diagnostic = hasModifier(node, ModifierFlags.Static) ? Diagnostics.Function_overload_must_be_static : Diagnostics.Function_overload_must_not_be_static;
+                                    error(errorNode, diagnostic);
+                                }
+                                return;
                             }
-                            return;
                         }
-                        else if (nodeIsPresent((<FunctionLikeDeclaration>subsequentNode).body)) {
+                        if (nodeIsPresent((<FunctionLikeDeclaration>subsequentNode).body)) {
                             error(errorNode, Diagnostics.Function_implementation_name_must_be_0, declarationNameToString(node.name!));
                             return;
                         }
