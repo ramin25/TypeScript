@@ -76,6 +76,7 @@
         "unittests/evaluation/forAwaitOf.ts",
         "unittests/evaluation/forOf.ts",
         "unittests/evaluation/objectRest.ts",
+        "unittests/evaluation/privateNameField.ts",
         "unittests/services/cancellableLanguageServiceOperations.ts",
         "unittests/services/colorization.ts",
         "unittests/services/convertToAsyncFunction.ts",
